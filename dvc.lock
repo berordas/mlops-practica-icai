@@ -5,36 +5,36 @@ stages:
     deps:
     - path: data/iris_dataset.csv
       hash: md5
-      md5: 4d301abed5efe50eccda350cde38e0eb
-      size: 2777
+      md5: ae244df326bd230685a3e47e0521ad56
+      size: 2795
   train:
-    cmd: python train.py --n_estimators 200
+    cmd: python train.py --n_estimators 300
     deps:
     - path: data/iris_dataset.csv
       hash: md5
-      md5: 4d301abed5efe50eccda350cde38e0eb
-      size: 2777
+      md5: ae244df326bd230685a3e47e0521ad56
+      size: 2795
     - path: requirements.txt
       hash: md5
-      md5: e1c4211648cdb04a199cfbee1872e517
-      size: 94
+      md5: 1cdf4e77a9e7475bf1c36659e3bd857f
+      size: 110
     - path: train.py
       hash: md5
       md5: 80838001a45b9c936a8a3001b14f49bf
       size: 3147
     params:
       params.yaml:
-        train.n_estimators: 200
+        train.n_estimators: 300
     outs:
     - path: confusion_matrix.png
       hash: md5
-      md5: 22bf211e5f7cfaed3b3c4a6c867e9757
-      size: 22339
+      md5: 32ea629e406b741c91c8bfe0b19800bf
+      size: 22209
     - path: mlflow_metrics.json
       hash: md5
-      md5: 9a0379eaa11dd7b9e9995a62a5f21656
-      size: 17
+      md5: c23a4b845cfcb729bc77225aaa6b5134
+      size: 32
     - path: model.pkl
       hash: md5
-      md5: 1e742f94f827bd713ac0c62e0fd94ba3
-      size: 370049
+      md5: 76f46b7e5d3a9ec4694c620a141d32f3
+      size: 530177
