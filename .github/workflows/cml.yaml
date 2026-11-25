@@ -59,6 +59,8 @@ jobs:
   deploy-to-gke:
     needs: train-and-report
     runs-on: ubuntu-latest
+    env:
+      CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
