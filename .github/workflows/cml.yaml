@@ -56,3 +56,90 @@ jobs:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
         run: |
           dvc repro
+
+  deploy-to-gke:
+    needs: train-and-report
+    runs-on: ubuntu-latest
+    env:
+      CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS: 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: DVC setup
+        uses: iterative/setup-dvc@v1
+
+      - id: 'auth'
+        name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud CLI and kubectl
+        uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          version: 'latest'
+          install_components: 'gke-gcloud-auth-plugin,kubectl'
+
+      - name: DVC Pull (descargar model.pkl desde DagsHub)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_API_KEY: ${{ secrets.DAGSHUB_API_KEY }}
+        run: |
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user $DAGSHUB_USERNAME
+          dvc remote modify origin --local password $DAGSHUB_API_KEY
+          dvc pull -r origin
+          ls -l model.pkl
+
+      - name: Configure Docker to use GCR
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build API Docker Image
+        id: build_api
+        run: |
+          IMAGE_NAME="gcr.io/${{ vars.GCP_PROJECT_ID }}/mlops-api:latest"
+          docker build -t $IMAGE_NAME .
+          echo "IMAGE_API=$IMAGE_NAME" >> $GITHUB_ENV
+
+      - name: Trivy Scan for API Image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_API }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL'
+
+      - name: Push API Docker Image
+        run: docker push ${{ env.IMAGE_API }}
+
+      - name: Build Web Docker Image
+        id: build_web
+        run: |
+          IMAGE_NAME="gcr.io/${{ vars.GCP_PROJECT_ID }}/mlops-web:latest"
+          docker build -t $IMAGE_NAME -f Dockerfile.web .
+          echo "IMAGE_WEB=$IMAGE_NAME" >> $GITHUB_ENV
+
+      - name: Trivy Scan for Web Image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_WEB }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL'
+
+      - name: Push Web Docker Image
+        run: docker push ${{ env.IMAGE_WEB }}
+
+      - name: Get GKE credentials
+        run: gcloud container clusters get-credentials ${{ vars.GKE_CLUSTER }} --zone ${{ vars.GKE_ZONE }} --project ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Deploy to GKE
+        run: |
+          kubectl apply -f api-deployment.yaml
+          kubectl apply -f api-service.yaml
+          kubectl apply -f web-deployment.yaml
+          kubectl apply -f web-service.yaml
+          kubectl rollout restart deployment/mlops-api-deployment deployment/mlops-web-deployment
+          kubectl rollout status deployment/mlops-api-deployment --timeout=300s
+          kubectl rollout status deployment/mlops-web-deployment --timeout=300s
