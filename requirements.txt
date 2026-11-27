@@ -9,3 +9,4 @@ dagshub
 pathspec==0.11.2
 Flask
 streamlit
+pyarrow==13.0.0
